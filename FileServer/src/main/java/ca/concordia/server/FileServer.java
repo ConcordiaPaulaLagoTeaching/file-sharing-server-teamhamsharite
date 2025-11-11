@@ -60,15 +60,18 @@ public class FileServer {
                                 writer.flush();
                                 break;
                             case "DELETE":
-                                fsManager.deleteFile(parts[1]);
-                                writer.println("SUCCESS: File '" + parts[1] + "' deleted.");
+                                try{
+                                    fsManager.deleteFile(parts[1]);
+                                    writer.println("SUCCESS: File '" + parts[1] + "' deleted.");
+                                } catch (Exception e){
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
                                 writer.flush();
                                 break;
                             case "LIST":
                                 writer.println(java.util.Arrays.toString(fsManager.listFile()));
                                 writer.flush();
                                 break;
-
 
                             case "QUIT":
                                 writer.println("SUCCESS: Disconnecting.");
