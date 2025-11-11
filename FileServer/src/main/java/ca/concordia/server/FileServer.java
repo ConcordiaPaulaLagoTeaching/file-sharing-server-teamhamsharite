@@ -37,12 +37,17 @@ public class FileServer {
 
                         switch (command) {
                             case "CREATE":
-                                fsManager.createFile(parts[1]);
-                                writer.println("SUCCESS: File '" + parts[1] + "' created.");
+
+                                try {
+                                    fsManager.createFile(parts[1]);
+                                    writer.println("SUCCESS: File '" + parts[1] + "' created.");
+                                } catch (Exception e) {
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
                                 writer.flush();
                                 break;
-                            //TODO: Implement other commands READ, WRITE, DELETE, LIST
 
+                            //TODO: Implement other commands READ, WRITE, DELETE, LIST
 
                             case "READ":
                                 fsManager.readFile(parts[1]);
@@ -60,8 +65,7 @@ public class FileServer {
                                 writer.flush();
                                 break;
                             case "LIST":
-                                fsManager.listFile();
-                                writer.println("SUCCESS: File '" + parts[1] + "' listed.");
+                                writer.println(java.util.Arrays.toString(fsManager.listFile()));
                                 writer.flush();
                                 break;
 

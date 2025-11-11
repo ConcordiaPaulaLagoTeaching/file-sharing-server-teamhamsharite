@@ -10,7 +10,7 @@ public class FileSystemManager {
     private final int MAXFILES = 5;
     private final int MAXBLOCKS = 10;
     private final static FileSystemManager instance = null;
-    private final RandomAccessFile disk = null;
+    private final RandomAccessFile disk;
     private final ReentrantLock globalLock = new ReentrantLock();
 
     private static final int BLOCK_SIZE = 128; // Example block size
@@ -21,20 +21,69 @@ public class FileSystemManager {
     public FileSystemManager(String filename, int totalSize) {
         // Initialize the file system manager with a file
         if(instance == null) {
-            //TODO Initialize the file system
+            try{
+                //TODO Initialize the file system
+                this.disk = new RandomAccessFile(filename, "rw");
+                this.disk.setLength(totalSize);
+                this.inodeTable = new FEntry[MAXFILES];
+                this.freeBlockList = new boolean[MAXBLOCKS];
+                java.util.Arrays.fill(freeBlockList, true);
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
         } else {
             throw new IllegalStateException("FileSystemManager is already initialized.");
         }
 
     }
 
+    // Helper function to find the next free index
+    private int findFreeInodeIndex(){
+        for (int i = 0; i < MAXFILES; i++) {
+            if (inodeTable[i] == null) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int findEntryIndexByName(String fileName){
+        for (int i = 0; i < MAXFILES; i++) {
+            if (inodeTable[i] != null && inodeTable[i].getFilename().equals(fileName)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     public void createFile(String fileName) throws Exception {
-        // TODO
-        throw new UnsupportedOperationException("Method not implemented yet.");
+
+        globalLock.lock();
+        try {
+            if (fileName == null || fileName.isEmpty()){
+                throw new IllegalArgumentException("Filename can't be empty!");
+            }
+            if (fileName.length() > 11){
+                throw new IllegalArgumentException("Filename can't be more than 11 characters long!");
+            }
+            if (findEntryIndexByName(fileName) != -1)
+                throw new IllegalArgumentException("File already exists.");
+
+            int freeIndex = findFreeInodeIndex();
+            if (freeIndex == -1){
+                throw new IllegalStateException("Max files reached.");
+            }
+
+            inodeTable[freeIndex] = new FEntry(fileName, (short) 0, (short) -1);
+        }
+        finally {
+            globalLock.unlock();
+        }
     }
     
     // TODO: Add readFile, writeFile and other required methods,
-
     public void readFile(String fileName) throws Exception {
         // TODO
         throw new UnsupportedOperationException("Method not implemented yet.");
@@ -46,13 +95,22 @@ public class FileSystemManager {
     }
 
     public void deleteFile(String fileName) throws Exception {
-        // TODO
-        throw new UnsupportedOperationException("Method not implemented yet.");
+        // Comming Soon
     }
 
-    public void listFile() throws Exception {
-        // TODO
-        throw new UnsupportedOperationException("Method not implemented yet.");
-    }
+    public String[] listFile() throws Exception {
+        globalLock.lock();
+        try {
+            java.util.ArrayList<String> names = new java.util.ArrayList<>();
+            for (int i = 0; i < MAXFILES; i++) {
+                if (inodeTable[i] != null) {
+                    names.add(inodeTable[i].getFilename());
+                }
+            }
 
+            return names.toArray(new String[0]);
+        } finally {
+            globalLock.unlock();
+        }
+    }
 }
