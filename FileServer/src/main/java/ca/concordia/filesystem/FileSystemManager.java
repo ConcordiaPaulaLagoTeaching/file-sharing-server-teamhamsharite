@@ -9,8 +9,8 @@ public class FileSystemManager {
 
     private final int MAXFILES = 5;
     private final int MAXBLOCKS = 10;
-    private final static FileSystemManager instance;
-    private final RandomAccessFile disk;
+    private final static FileSystemManager instance = null;
+    private final RandomAccessFile disk = null;
     private final ReentrantLock globalLock = new ReentrantLock();
 
     private static final int BLOCK_SIZE = 128; // Example block size
@@ -32,7 +32,27 @@ public class FileSystemManager {
         // TODO
         throw new UnsupportedOperationException("Method not implemented yet.");
     }
-
-
+    
     // TODO: Add readFile, writeFile and other required methods,
+
+    public void readFile(String fileName) throws Exception {
+        // TODO
+        throw new UnsupportedOperationException("Method not implemented yet.");
+    }
+
+    public void writeFile(String fileName, String content) throws Exception {
+        // TODO
+        throw new UnsupportedOperationException("Method not implemented yet.");
+    }
+
+    public void deleteFile(String fileName) throws Exception {
+        // TODO
+        throw new UnsupportedOperationException("Method not implemented yet.");
+    }
+
+    public void listFile() throws Exception {
+        // TODO
+        throw new UnsupportedOperationException("Method not implemented yet.");
+    }
+
 }
