@@ -46,17 +46,22 @@ public class FileServer {
                                 }
                                 writer.flush();
                                 break;
-
-                            //TODO: Implement other commands READ, WRITE, DELETE, LIST
-
                             case "READ":
-                                fsManager.readFile(parts[1]);
-                                writer.println("SUCCESS: File '" + parts[1] + "' read.");
+                                try {
+                                    String response = fsManager.readFile(parts[1]);
+                                    writer.println("SUCCESS: File '" + parts[1] + "' read. File contains: " + response);
+                                } catch (Exception e) {
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
                                 writer.flush();
                                 break;
                             case "WRITE":
-                                fsManager.writeFile(parts[1], parts[2]);
-                                writer.println("SUCCESS: File '" + parts[1] + "' written.");
+                                try {
+                                    fsManager.writeFile(parts[1], parts[2]);
+                                    writer.println("SUCCESS: File '" + parts[1] + "' written.");
+                                } catch (Exception e) {
+                                    writer.println("ERROR: " + e.getMessage());
+                                }
                                 writer.flush();
                                 break;
                             case "DELETE":

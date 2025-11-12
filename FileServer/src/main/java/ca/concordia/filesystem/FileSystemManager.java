@@ -84,15 +84,86 @@ public class FileSystemManager {
     }
     
     // TODO: Add readFile, writeFile and other required methods,
-    public void readFile(String fileName) throws Exception {
-        // TODO
-        throw new UnsupportedOperationException("Method not implemented yet.");
+    public String readFile(String fileName) throws Exception {
+        globalLock.lock();
+        try {
+            if (fileName == null || fileName.isEmpty())
+                throw new IllegalArgumentException("Filename can't be empty!");
+
+            int inodeIndex = findInodeByName(fileName);
+            if (inodeIndex == -1)
+                throw new IllegalArgumentException("File does not exist.");
+
+            FEntry fe = inodeTable[inodeIndex];
+            int fileSize = Short.toUnsignedInt(fe.getFilesize());
+            int startBlock = fe.getFirstBlock();
+
+            if (startBlock < 0)
+                throw new IllegalStateException("File has no data blocks.");
+
+            byte[] buffer = new byte[fileSize];
+            disk.seek(calculateBlockOffset(startBlock));
+            disk.readFully(buffer, 0, fileSize);
+
+            return new String(buffer);
+
+        } finally {
+            globalLock.unlock();
+        }
     }
 
+
     public void writeFile(String fileName, String content) throws Exception {
-        // TODO
-        throw new UnsupportedOperationException("Method not implemented yet.");
+        globalLock.lock();
+        try {
+            if (fileName == null || fileName.isEmpty())
+                throw new IllegalArgumentException("Filename can't be empty!");
+            if (content == null)
+                throw new IllegalArgumentException("Content can't be null!");
+
+            int inodeIndex = findInodeByName(fileName);
+            if (inodeIndex == -1)
+                throw new IllegalArgumentException("File does not exist.");
+
+            byte[] data = content.getBytes();
+            int blocksNeeded = getBlockCountForSize(data.length);
+
+            int startBlock = -1;
+            for (int i = 0; i <= MAXBLOCKS - blocksNeeded; i++) {
+                boolean allFree = true;
+                for (int j = 0; j < blocksNeeded; j++) {
+                    if (!freeBlockList[i + j]) {
+                        allFree = false;
+                        break;
+                    }
+                }
+                if (allFree) {
+                    startBlock = i;
+                    break;
+                }
+            }
+
+            if (startBlock == -1)
+                throw new IllegalStateException("Not enough free space to write file.");
+
+            updateBlockAllocation(startBlock, blocksNeeded, false);
+
+            disk.seek(calculateBlockOffset(startBlock));
+            disk.write(data);
+
+            int remaining = blocksNeeded * BLOCK_SIZE - data.length;
+            if (remaining > 0)
+                disk.write(new byte[remaining]);
+
+            inodeTable[inodeIndex] = new FEntry(fileName, (short) data.length, (short) startBlock);
+
+        } finally {
+            globalLock.unlock();
+        }
     }
+
+
+
 
 
     // Helper functions
