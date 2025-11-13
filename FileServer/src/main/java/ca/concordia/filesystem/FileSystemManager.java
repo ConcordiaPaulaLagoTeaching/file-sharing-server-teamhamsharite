@@ -2,7 +2,9 @@ package ca.concordia.filesystem;
 
 import ca.concordia.filesystem.datastructures.FEntry;
 
+import java.io.File;
 import java.io.RandomAccessFile;
+import java.util.Arrays;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -10,7 +12,6 @@ public class FileSystemManager {
 
     private final int MAXFILES = 5;
     private final int MAXBLOCKS = 10;
-    private final static FileSystemManager instance = null;
     private final RandomAccessFile disk;
     private final ReentrantReadWriteLock globalLock = new ReentrantReadWriteLock();
 
@@ -18,26 +19,88 @@ public class FileSystemManager {
 
     private FEntry[] inodeTable; // Array of inodes
     private boolean[] freeBlockList; // Bitmap for free blocks
+    private final int METADATA_SIZE = (MAXFILES * 15) + (MAXBLOCKS); //15 bytes per inode(11 name + 2 size + 2 firstBlock)
+
 
     public FileSystemManager(String filename, int totalSize) {
         // Initialize the file system manager with a file
-        if(instance == null) {
             try{
-                //TODO Initialize the file system
+                File fd = new File(filename);
+                boolean newFile = !fd.exists();
+
                 this.disk = new RandomAccessFile(filename, "rw");
                 this.disk.setLength(totalSize);
                 this.inodeTable = new FEntry[MAXFILES];
                 this.freeBlockList = new boolean[MAXBLOCKS];
-                java.util.Arrays.fill(freeBlockList, true);
+                if (newFile) {
+                    //filesystem
+                    Arrays.fill(freeBlockList, true);
+                    saveMetadata();
+                } else {
+                    loadMetadata();
+                }
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
+    }
 
-        } else {
-            throw new IllegalStateException("FileSystemManager is already initialized.");
+
+    private void saveMetadata() throws Exception{
+        try{
+            globalLock.writeLock().lock();
+
+            disk.seek(0);
+            for (int i = 0; i < MAXFILES; i++) {
+                if (inodeTable[i] == null) {
+                    disk.write(new byte[11]);
+                    disk.writeShort(0);
+                    disk.writeShort(-1);
+                } else {
+                    byte[] nameBytes = new byte[11];
+                    byte[] actual = inodeTable[i].getFilename().getBytes();
+                    System.arraycopy(actual, 0, nameBytes, 0, Math.min(actual.length, 11));
+                    disk.write(nameBytes);
+
+                    disk.writeShort(inodeTable[i].getFilesize());
+                    disk.writeShort(inodeTable[i].getFirstBlock());
+                }
+            }
+            for (int i = 0; i < MAXBLOCKS; i++) {
+                disk.writeBoolean(freeBlockList[i]);
+            }
+
+            disk.getFD().sync();
         }
+        finally {
+            globalLock.writeLock().unlock();
+        }
+    }
 
+    private void loadMetadata() throws Exception {
+        globalLock.writeLock().lock();
+        try {
+            disk.seek(0);
+            for (int i = 0; i < MAXFILES; i++) {
+                byte[] nameBytes = new byte[11];
+                disk.readFully(nameBytes);
+
+                String name = new String(nameBytes).trim();
+                short size = disk.readShort();
+                short startBlock = disk.readShort();
+                if (!name.isEmpty()) {
+                    inodeTable[i] = new FEntry(name, size, startBlock);
+                } else {
+                    inodeTable[i] = null;
+                }
+            }
+            for (int i = 0; i < MAXBLOCKS; i++) {
+                freeBlockList[i] = disk.readBoolean();
+            }
+        }
+        finally {
+            globalLock.writeLock().unlock();
+        }
     }
 
     // Helper function to find the next free index
@@ -78,13 +141,13 @@ public class FileSystemManager {
             }
 
             inodeTable[freeIndex] = new FEntry(fileName, (short) 0, (short) -1);
+            saveMetadata();
         }
         finally {
             globalLock.writeLock().unlock();
         }
     }
     
-    // TODO: Add readFile, writeFile and other required methods,
     public byte[] readFile(String fileName) throws Exception {
         globalLock.readLock().lock();
         try {
@@ -105,9 +168,7 @@ public class FileSystemManager {
             byte[] buffer = new byte[fileSize];
             disk.seek(calculateBlockOffset(startBlock));
             disk.readFully(buffer, 0, fileSize);
-
             return buffer;
-
         } finally {
             globalLock.readLock().unlock();
         }
@@ -157,14 +218,12 @@ public class FileSystemManager {
                 disk.write(new byte[remaining]);
 
             inodeTable[inodeIndex] = new FEntry(fileName, (short) data.length, (short) startBlock);
+            saveMetadata();
 
         } finally {
             globalLock.writeLock().unlock();
         }
     }
-
-
-
 
 
     // Helper functions
@@ -173,7 +232,7 @@ public class FileSystemManager {
     }
 
     private long calculateBlockOffset(int blockIndex) {
-        return (long) blockIndex * BLOCK_SIZE;
+        return METADATA_SIZE + (long) blockIndex * BLOCK_SIZE;
     }
 
     private void clearBlocks(int startBlock, int len) throws Exception {
@@ -210,8 +269,8 @@ public class FileSystemManager {
                 updateBlockAllocation(start, blocks, true);
             }
 
-            // Remove inode
-            inodeTable[index] = null;
+            inodeTable[index] = null; //remove inode
+            saveMetadata();
         } finally {
             globalLock.writeLock().unlock();
         }
@@ -226,7 +285,6 @@ public class FileSystemManager {
                     names.add(inodeTable[i].getFilename());
                 }
             }
-
             return names.toArray(new String[0]);
         } finally {
             globalLock.readLock().unlock();
