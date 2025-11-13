@@ -39,12 +39,18 @@ public class FileServer {
         ) {
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("Received from client: " + line);
-                String[] parts = line.split(" ");
+                if (line.trim().isEmpty())
+                    continue;
+                System.out.println("Received: " + line);
+                String[] parts = line.split(" ", 3);
                 String command = parts[0].toUpperCase();
 
                 switch (command) {
                     case "CREATE":
+                        if (parts.length < 2) {
+                            writer.println("ERROR Missing file name!");
+                            break;
+                        }
                         try {
                             fsManager.createFile(parts[1]);
                             writer.println("SUCCESS: File '" + parts[1] + "' created.");
@@ -53,6 +59,10 @@ public class FileServer {
                         }
                         break;
                     case "READ":
+                        if (parts.length < 2) {
+                            writer.println("ERROR Missing file name!");
+                            break;
+                        }
                         try {
                             byte[] response = fsManager.readFile(parts[1]);
                             writer.println("SUCCESS: File '" + parts[1] + "' read. File contains: " + new String(response));
@@ -61,6 +71,10 @@ public class FileServer {
                         }
                         break;
                     case "WRITE":
+                        if (parts.length < 3) {
+                            writer.println("ERROR Missing arguments!!");
+                            break;
+                        }
                         try {
                             fsManager.writeFile(parts[1], parts[2].getBytes());
                             writer.println("SUCCESS: File '" + parts[1] + "' written.");
@@ -69,6 +83,10 @@ public class FileServer {
                         }
                         break;
                     case "DELETE":
+                        if (parts.length < 2) {
+                            writer.println("ERROR Missing file name!");
+                            break;
+                        }
                         try {
                             fsManager.deleteFile(parts[1]);
                             writer.println("SUCCESS: File '" + parts[1] + "' deleted.");
