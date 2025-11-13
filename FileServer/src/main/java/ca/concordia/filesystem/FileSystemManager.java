@@ -4,6 +4,7 @@ import ca.concordia.filesystem.datastructures.FEntry;
 
 import java.io.RandomAccessFile;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class FileSystemManager {
 
@@ -11,7 +12,7 @@ public class FileSystemManager {
     private final int MAXBLOCKS = 10;
     private final static FileSystemManager instance = null;
     private final RandomAccessFile disk;
-    private final ReentrantLock globalLock = new ReentrantLock();
+    private final ReentrantReadWriteLock globalLock = new ReentrantReadWriteLock();
 
     private static final int BLOCK_SIZE = 128; // Example block size
 
@@ -60,7 +61,7 @@ public class FileSystemManager {
 
     public void createFile(String fileName) throws Exception {
 
-        globalLock.lock();
+        globalLock.writeLock().lock();
         try {
             if (fileName == null || fileName.isEmpty()){
                 throw new IllegalArgumentException("Filename can't be empty!");
@@ -79,13 +80,13 @@ public class FileSystemManager {
             inodeTable[freeIndex] = new FEntry(fileName, (short) 0, (short) -1);
         }
         finally {
-            globalLock.unlock();
+            globalLock.writeLock().unlock();
         }
     }
     
     // TODO: Add readFile, writeFile and other required methods,
-    public String readFile(String fileName) throws Exception {
-        globalLock.lock();
+    public byte[] readFile(String fileName) throws Exception {
+        globalLock.readLock().lock();
         try {
             if (fileName == null || fileName.isEmpty())
                 throw new IllegalArgumentException("Filename can't be empty!");
@@ -105,27 +106,27 @@ public class FileSystemManager {
             disk.seek(calculateBlockOffset(startBlock));
             disk.readFully(buffer, 0, fileSize);
 
-            return new String(buffer);
+            return buffer;
 
         } finally {
-            globalLock.unlock();
+            globalLock.readLock().unlock();
         }
     }
 
 
-    public void writeFile(String fileName, String content) throws Exception {
-        globalLock.lock();
+    public void writeFile(String fileName, byte[] data) throws Exception {
+        globalLock.writeLock().lock();
         try {
             if (fileName == null || fileName.isEmpty())
                 throw new IllegalArgumentException("Filename can't be empty!");
-            if (content == null)
-                throw new IllegalArgumentException("Content can't be null!");
+
+            if (data.length == 0)
+                throw new IllegalArgumentException("Data can't be empty!");
 
             int inodeIndex = findInodeByName(fileName);
             if (inodeIndex == -1)
                 throw new IllegalArgumentException("File does not exist.");
 
-            byte[] data = content.getBytes();
             int blocksNeeded = getBlockCountForSize(data.length);
 
             int startBlock = -1;
@@ -158,7 +159,7 @@ public class FileSystemManager {
             inodeTable[inodeIndex] = new FEntry(fileName, (short) data.length, (short) startBlock);
 
         } finally {
-            globalLock.unlock();
+            globalLock.writeLock().unlock();
         }
     }
 
@@ -190,7 +191,7 @@ public class FileSystemManager {
     }
 
     public void deleteFile(String fileName) throws Exception {
-        globalLock.lock();
+        globalLock.writeLock().lock();
         try {
             if (fileName == null || fileName.isEmpty()){
                 throw new IllegalArgumentException("Filename can't be empty!");
@@ -212,12 +213,12 @@ public class FileSystemManager {
             // Remove inode
             inodeTable[index] = null;
         } finally {
-            globalLock.unlock();
+            globalLock.writeLock().unlock();
         }
     }
 
     public String[] listFile() throws Exception {
-        globalLock.lock();
+        globalLock.readLock().lock();
         try {
             java.util.ArrayList<String> names = new java.util.ArrayList<>();
             for (int i = 0; i < MAXFILES; i++) {
@@ -228,7 +229,7 @@ public class FileSystemManager {
 
             return names.toArray(new String[0]);
         } finally {
-            globalLock.unlock();
+            globalLock.readLock().unlock();
         }
     }
 }
